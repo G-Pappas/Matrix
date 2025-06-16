@@ -1,11 +1,12 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 class DeviceBase(BaseModel):
     name: str
     ip_address: str
     device_type: str
+    tags: List[str] = []
 
 class DeviceCreate(DeviceBase):
     pass
@@ -15,4 +16,4 @@ class DeviceRead(DeviceBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 
