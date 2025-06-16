@@ -19,10 +19,13 @@ import {
   FormControl,
   InputLabel,
   Box,
+  Button,
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material/Select';
 import { useNavigate } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
 import axios from 'axios';
 
 interface Device {
@@ -76,8 +79,8 @@ const DeviceList = () => {
     }
   };
 
-  const handleGroupByChange = (event: any) => {
-    setGroupBy(event.target.value);
+  const handleGroupByChange = (event: SelectChangeEvent<GroupByOption>) => {
+    setGroupBy(event.target.value as GroupByOption);
   };
 
   const groupDevices = () => {
@@ -131,37 +134,47 @@ const DeviceList = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">
           Network Devices
         </Typography>
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel sx={{ color: 'white' }}>Group By</InputLabel>
-          <Select
-            value={groupBy}
-            onChange={handleGroupByChange}
-            label="Group By"
-            sx={{
-              color: 'white',
-              '.MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255, 255, 255, 0.23)',
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255, 255, 255, 0.5)',
-              },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'white',
-              },
-              '.MuiSvgIcon-root': {
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <FormControl sx={{ minWidth: 200 }}>
+            <InputLabel sx={{ color: 'white' }}>Group By</InputLabel>
+            <Select
+              value={groupBy}
+              label="Group By"
+              onChange={handleGroupByChange}
+              sx={{
                 color: 'white',
-              },
-            }}
+                '.MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.23)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255, 255, 255, 0.5)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'white',
+                },
+                '.MuiSvgIcon-root': {
+                  color: 'white',
+                },
+              }}
+            >
+              <MenuItem value="none">No Grouping</MenuItem>
+              <MenuItem value="device_type">Device Type</MenuItem>
+              <MenuItem value="tags">Tags</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/devices/new')}
           >
-            <MenuItem value="none">No Grouping</MenuItem>
-            <MenuItem value="device_type">Device Type</MenuItem>
-            <MenuItem value="tags">Tags</MenuItem>
-          </Select>
-        </FormControl>
+            Add Device
+          </Button>
+        </Box>
       </Box>
       
       {error && (
@@ -170,74 +183,80 @@ const DeviceList = () => {
         </Alert>
       )}
 
-      {Object.entries(groupedDevices).map(([group, groupDevices]) => (
-        <Box key={group} sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>
-            {group} ({groupDevices.length})
-          </Typography>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>IP Address</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Created At</TableCell>
-                  <TableCell>Tags</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {groupDevices.length === 0 ? (
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        Object.entries(groupedDevices).map(([group, groupDevices]) => (
+          <Box key={group} sx={{ mb: 4 }}>
+            <Typography variant="h6" sx={{ mb: 1, color: 'primary.main' }}>
+              {group} ({groupDevices.length})
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      No devices found
-                    </TableCell>
+                    <TableCell>Name</TableCell>
+                    <TableCell>IP Address</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Created At</TableCell>
+                    <TableCell>Tags</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
-                ) : (
-                  groupDevices.map((device) => (
-                    <TableRow key={device.id}>
-                      <TableCell>{device.name}</TableCell>
-                      <TableCell>{device.ip_address}</TableCell>
-                      <TableCell>{device.device_type}</TableCell>
-                      <TableCell>
-                        {new Date(device.created_at).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                          {device.tags?.map((tag) => (
-                            <Chip
-                              key={tag}
-                              label={tag}
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
-                          ))}
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <IconButton
-                          onClick={() => navigate(`/devices/${device.id}/edit`)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          onClick={() => handleDelete(device.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
+                </TableHead>
+                <TableBody>
+                  {groupDevices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center">
+                        No devices found
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      ))}
+                  ) : (
+                    groupDevices.map((device) => (
+                      <TableRow key={device.id}>
+                        <TableCell>{device.name}</TableCell>
+                        <TableCell>{device.ip_address}</TableCell>
+                        <TableCell>{device.device_type}</TableCell>
+                        <TableCell>
+                          {new Date(device.created_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                            {device.tags?.map((tag) => (
+                              <Chip
+                                key={tag}
+                                label={tag}
+                                size="small"
+                                color="primary"
+                                variant="outlined"
+                              />
+                            ))}
+                          </Stack>
+                        </TableCell>
+                        <TableCell>
+                          <IconButton
+                            onClick={() => navigate(`/devices/${device.id}/edit`)}
+                            color="primary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                          <IconButton
+                            onClick={() => handleDelete(device.id)}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        ))
+      )}
     </Container>
   );
 };

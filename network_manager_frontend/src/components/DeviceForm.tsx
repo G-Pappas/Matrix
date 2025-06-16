@@ -29,17 +29,12 @@ interface DeviceResponse extends DeviceFormData {
   created_at: string;
 }
 
-const DEVICE_TYPES = [
-  'Router',
-  'Switch',
-  'Firewall',
-  'Access Point',
-  'Server',
-  'Workstation',
-  'Printer',
-  'Camera',
-  'Other'
-];
+interface DeviceType {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+}
 
 const DeviceForm = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,22 +47,27 @@ const DeviceForm = () => {
   });
   const [tagInput, setTagInput] = useState('');
   const [existingTags, setExistingTags] = useState<string[]>([]);
+  const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([]);
 
   useEffect(() => {
-    // Fetch all devices to get existing tags
-    const fetchExistingTags = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/devices/');
-        const allTags = response.data
+        // Fetch device types
+        const typesResponse = await axios.get('http://localhost:8000/device-types/');
+        setDeviceTypes(typesResponse.data);
+
+        // Fetch existing tags
+        const devicesResponse = await axios.get('http://localhost:8000/devices/');
+        const allTags = devicesResponse.data
           .flatMap((device: DeviceResponse) => device.tags || [])
-          .filter((tag: string, index: number, self: string[]) => self.indexOf(tag) === index); // Remove duplicates
+          .filter((tag: string, index: number, self: string[]) => self.indexOf(tag) === index);
         setExistingTags(allTags);
       } catch (error) {
-        console.error('Error fetching existing tags:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
-    fetchExistingTags();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -89,6 +89,38 @@ const DeviceForm = () => {
     }
   }, [id]);
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name as string]: value,
+    }));
+  };
+
+  const handleTagInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setTagInput(event.target.value);
+  };
+
+  const handleTagInputKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && tagInput.trim()) {
+      event.preventDefault();
+      if (!formData.tags.includes(tagInput.trim())) {
+        setFormData(prev => ({
+          ...prev,
+          tags: [...prev.tags, tagInput.trim()],
+        }));
+      }
+      setTagInput('');
+    }
+  };
+
+  const handleTagDelete = (tagToDelete: string) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToDelete),
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -101,38 +133,6 @@ const DeviceForm = () => {
     } catch (error) {
       console.error('Error saving device:', error);
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name as string]: value,
-    });
-  };
-
-  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTagInput(e.target.value);
-  };
-
-  const handleTagInputKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      if (!formData.tags.includes(tagInput.trim())) {
-        setFormData({
-          ...formData,
-          tags: [...formData.tags, tagInput.trim()],
-        });
-      }
-      setTagInput('');
-    }
-  };
-
-  const handleDeleteTag = (tagToDelete: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags.filter(tag => tag !== tagToDelete),
-    });
   };
 
   return (
@@ -168,63 +168,66 @@ const DeviceForm = () => {
               onChange={handleChange}
               label="Device Type"
             >
-              {DEVICE_TYPES.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
+              {deviceTypes.map((type) => (
+                <MenuItem key={type.id} value={type.name}>
+                  {type.name}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           
-          <Autocomplete
-            freeSolo
-            options={existingTags}
-            value={tagInput}
-            onChange={(event, newValue) => {
-              if (newValue && typeof newValue === 'string' && !formData.tags.includes(newValue)) {
-                setFormData({
-                  ...formData,
-                  tags: [...formData.tags, newValue],
-                });
-                setTagInput('');
-              }
-            }}
-            inputValue={tagInput}
-            onInputChange={(event, newInputValue) => {
-              setTagInput(newInputValue);
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                fullWidth
-                label="Add Tags (Press Enter to add)"
-                margin="normal"
-                helperText="Type to see existing tags or press Enter to add a new one"
-              />
-            )}
-          />
-          
-          <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: 'wrap', gap: 1 }}>
-            {formData.tags.map((tag) => (
-              <Chip
-                key={tag}
-                label={tag}
-                onDelete={() => handleDeleteTag(tag)}
-                color="primary"
-                variant="outlined"
-              />
-            ))}
-          </Stack>
           <Box sx={{ mt: 2 }}>
-            <Button type="submit" variant="contained" color="primary">
-              {id ? 'Update' : 'Add'} Device
-            </Button>
+            <Typography variant="subtitle1" gutterBottom>
+              Tags
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+              {formData.tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  onDelete={() => handleTagDelete(tag)}
+                />
+              ))}
+            </Stack>
+            <Autocomplete
+              freeSolo
+              options={existingTags}
+              value={tagInput}
+              onChange={(_, newValue) => {
+                if (newValue && !formData.tags.includes(newValue)) {
+                  setFormData(prev => ({
+                    ...prev,
+                    tags: [...prev.tags, newValue],
+                  }));
+                }
+                setTagInput('');
+              }}
+              inputValue={tagInput}
+              onInputChange={(_, newInputValue) => setTagInput(newInputValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  label="Add Tag"
+                  onKeyPress={handleTagInputKeyPress}
+                />
+              )}
+            />
+          </Box>
+
+          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
             <Button
-              onClick={() => navigate('/')}
-              sx={{ ml: 1 }}
               variant="outlined"
+              onClick={() => navigate('/')}
             >
               Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+            >
+              {id ? 'Save Changes' : 'Add Device'}
             </Button>
           </Box>
         </Box>
