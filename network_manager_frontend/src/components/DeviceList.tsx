@@ -20,12 +20,15 @@ import {
   InputLabel,
   Box,
   Button,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import { useNavigate } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import axios from 'axios';
 
 interface Device {
@@ -44,6 +47,8 @@ const DeviceList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupByOption>('none');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
   const fetchDevices = async () => {
@@ -81,46 +86,40 @@ const DeviceList = () => {
 
   const handleGroupByChange = (event: SelectChangeEvent<GroupByOption>) => {
     setGroupBy(event.target.value as GroupByOption);
+    setSelectedTag(null); // Reset selected tag when changing group by option
   };
 
-  const groupDevices = () => {
-    if (groupBy === 'none') {
-      return { 'All Devices': devices };
-    }
+  const handleTagClick = (tag: string) => {
+    setGroupBy('tags');
+    setSelectedTag(tag);
+  };
 
-    if (groupBy === 'device_type') {
-      return devices.reduce((acc, device) => {
+  const filteredDevices = devices.filter(device => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      device.name.toLowerCase().includes(searchLower) ||
+      device.ip_address.toLowerCase().includes(searchLower) ||
+      device.device_type.toLowerCase().includes(searchLower) ||
+      device.tags.some(tag => tag.toLowerCase().includes(searchLower))
+    );
+  });
+
+  const groupedDevices = groupBy === 'none' 
+    ? { 'All Devices': filteredDevices }
+    : groupBy === 'device_type'
+    ? filteredDevices.reduce((acc, device) => {
         const type = device.device_type;
-        if (!acc[type]) {
-          acc[type] = [];
-        }
+        if (!acc[type]) acc[type] = [];
         acc[type].push(device);
         return acc;
+      }, {} as Record<string, Device[]>)
+    : filteredDevices.reduce((acc, device) => {
+        device.tags.forEach(tag => {
+          if (!acc[tag]) acc[tag] = [];
+          acc[tag].push(device);
+        });
+        return acc;
       }, {} as Record<string, Device[]>);
-    }
-
-    if (groupBy === 'tags') {
-      const grouped: Record<string, Device[]> = {};
-      devices.forEach(device => {
-        if (device.tags && device.tags.length > 0) {
-          device.tags.forEach(tag => {
-            if (!grouped[tag]) {
-              grouped[tag] = [];
-            }
-            grouped[tag].push(device);
-          });
-        } else {
-          if (!grouped['No Tags']) {
-            grouped['No Tags'] = [];
-          }
-          grouped['No Tags'].push(device);
-        }
-      });
-      return grouped;
-    }
-
-    return { 'All Devices': devices };
-  };
 
   if (loading) {
     return (
@@ -129,8 +128,6 @@ const DeviceList = () => {
       </Container>
     );
   }
-
-  const groupedDevices = groupDevices();
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -166,6 +163,36 @@ const DeviceList = () => {
               <MenuItem value="tags">Tags</MenuItem>
             </Select>
           </FormControl>
+          <TextField
+            placeholder="Search devices..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            sx={{ 
+              minWidth: 300,
+              '& .MuiInputBase-input': {
+                color: 'white'
+              },
+              '& .MuiInputLabel-root': {
+                color: 'white'
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(255, 255, 255, 0.23)'
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'rgba(255, 255, 255, 0.5)'
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: 'primary.main'
+              }
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: 'white' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
           <Button
             variant="contained"
             color="primary"
@@ -177,6 +204,22 @@ const DeviceList = () => {
         </Box>
       </Box>
       
+      {/* Clear Filters button above the device list, visible when groupBy is not 'none' */}
+      {groupBy !== 'none' && (
+        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => {
+              setSelectedTag(null);
+              setGroupBy('none');
+            }}
+          >
+            Clear Filters
+          </Button>
+        </Box>
+      )}
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -228,8 +271,21 @@ const DeviceList = () => {
                                 key={tag}
                                 label={tag}
                                 size="small"
-                                color="primary"
-                                variant="outlined"
+                                onClick={() => handleTagClick(tag)}
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  backgroundColor: 'transparent',
+                                  border: '1px solid',
+                                  borderColor: 'primary.main',
+                                  color: 'primary.main',
+                                  '&:hover': {
+                                    backgroundColor: 'primary.main',
+                                    color: 'white',
+                                    '& .MuiChip-label': {
+                                      color: 'white'
+                                    }
+                                  }
+                                }}
                               />
                             ))}
                           </Stack>
